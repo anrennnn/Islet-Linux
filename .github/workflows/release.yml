@@ -78,6 +78,7 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           path: dist-all
+          pattern: islet-*
           merge-multiple: true
       - name: Checksums
         run: cd dist-all && sha256sum * > SHA256SUMS.txt
