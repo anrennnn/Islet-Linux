@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Prueba de instalación de extremo a extremo dentro de un contenedor de la distro.
 #   bash tests/install-test.sh            → instala desde ISLET_LOCAL_DIR o desde la última release
-#   bash tests/install-test.sh --appimage → prueba la vía AppImage
+#   bash tests/install-test.sh --portable → prueba la instalación sin root (.tar.gz)
+#   bash tests/install-test.sh --appimage-file → ejecuta el .AppImage directamente (sin instalar)
 # Comprueba: install.sh termina bien, el binario existe, la app arranca, crea su ventana
 # y lee un reproductor MPRIS de prueba por D-Bus.
 set -euo pipefail
@@ -16,15 +17,15 @@ case " $ID $ID_LIKE " in
     export DEBIAN_FRONTEND=noninteractive
     apt-get -qq update && apt-get -qq install -y curl ca-certificates sudo xvfb xauth x11-utils dbus dbus-x11 >/dev/null ;;
   *" fedora "*|*" rhel "*)
-    dnf -q -y install curl sudo xorg-x11-server-Xvfb xorg-x11-xauth xwininfo dbus-daemon dbus-tools which findutils procps-ng >/dev/null ;;
+    dnf -q -y install curl tar gzip sudo xorg-x11-server-Xvfb xorg-x11-xauth xwininfo dbus-daemon dbus-tools which findutils procps-ng >/dev/null ;;
   *" suse "*|*" opensuse"*)
-    zypper -q -n install curl sudo xvfb-run xwininfo dbus-1 which findutils procps >/dev/null ;;
+    zypper -q -n install curl sudo xvfb-run xwininfo /usr/bin/dbus-run-session which findutils procps tar gzip >/dev/null ;;
   *" arch "*)
     pacman -Syu --noconfirm --needed -q curl sudo xorg-server-xvfb xorg-xauth xorg-xwininfo dbus which findutils procps-ng >/dev/null ;;
 esac
 
-# Un escritorio real ya trae estas librerías; el AppImage las usa del sistema.
-if [ "$MODE_ARG" = --appimage ]; then
+# Un escritorio real ya trae estas librerías; la versión portable y el AppImage las usan del sistema.
+if [ "$MODE_ARG" = --portable ] || [ "$MODE_ARG" = --appimage-file ]; then
   case " $ID $ID_LIKE " in
     *" debian "*|*" ubuntu "*) apt-get -qq install -y libgtk-3-0t64 libnss3 libasound2t64 libgbm1 libxss1 libxtst6 >/dev/null 2>&1 \
       || apt-get -qq install -y libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 >/dev/null ;;
@@ -37,6 +38,13 @@ fi
 id tester >/dev/null 2>&1 || useradd -m tester
 mkdir -p /etc/sudoers.d && echo 'tester ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tester
 
+if [ "$MODE_ARG" = --appimage-file ]; then
+  # El AppImage tal cual lo bajaría un usuario; sin FUSE en el contenedor se extrae al vuelo.
+  IMG=$(find "$ISLET_LOCAL_DIR" -maxdepth 1 -name '*.AppImage' | grep -E "$(uname -m | sed 's/aarch64/arm64/')" | head -n1)
+  install -m 755 "$IMG" /home/tester/Islet.AppImage
+  printf '#!/bin/sh\nexec env APPIMAGE_EXTRACT_AND_RUN=1 /home/tester/Islet.AppImage "$@"\n' > /usr/local/bin/islet
+  chmod 755 /usr/local/bin/islet
+else
 echo "--- install.sh"
 INSTALLER="$HERE/install.sh"
 if [ -n "${ISLET_INSTALLER_URL:-}" ]; then
@@ -47,6 +55,7 @@ fi
 sudo -u tester env ISLET_LOCAL_DIR="${ISLET_LOCAL_DIR:-}" GITHUB_TOKEN="${GITHUB_TOKEN:-}" PATH="/home/tester/.local/bin:$PATH" \
   bash "$INSTALLER" $MODE_ARG 2>&1 | grep -vE '^\s*#|%' | tail -4
 [ "${PIPESTATUS[0]}" = 0 ] || { echo "FALLO: install.sh terminó con error"; exit 1; }
+fi
 
 BIN=$(sudo -u tester env PATH="/home/tester/.local/bin:$PATH" sh -c 'command -v islet' || true)
 [ -n "$BIN" ] || { echo "FALLO: no se encontró el comando islet"; exit 1; }
@@ -79,6 +88,7 @@ chmod 755 /tmp/run-islet.sh
 sudo -u tester env PATH="/home/tester/.local/bin:$PATH" HOME=/home/tester \
   dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24' bash /tmp/run-islet.sh
 
+if [ "$MODE_ARG" = --appimage-file ]; then echo "### OK: $PRETTY_NAME ${MODE_ARG}"; exit 0; fi
 echo "--- desinstalación"
 sudo -u tester env PATH="/home/tester/.local/bin:$PATH" bash "$HERE/install.sh" --uninstall | tail -1
 sudo -u tester env PATH="/home/tester/.local/bin:$PATH" sh -c 'command -v islet' && { echo "FALLO: sigue instalado"; exit 1; }

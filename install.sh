@@ -4,7 +4,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/anrennnn/Islet-Linux/main/install.sh | bash
 #
-# Opciones:  --appimage   fuerza la versión AppImage (sin root)
+# Opciones:  --portable   instala en tu carpeta de usuario, sin root (alias: --appimage)
 #            --uninstall  desinstala Islet
 # Variables: ISLET_LOCAL_DIR=<carpeta> instala desde paquetes ya descargados (sin internet)
 set -euo pipefail
@@ -14,9 +14,9 @@ APP="islet"
 MODE="auto"
 for arg in "$@"; do
   case "$arg" in
-    --appimage) MODE="appimage" ;;
+    --portable|--appimage) MODE="portable" ;;
     --uninstall) MODE="uninstall" ;;
-    -h|--help) echo "Uso: install.sh [--appimage|--uninstall]"; exit 0 ;;
+    -h|--help) echo "Uso: install.sh [--portable|--uninstall]"; exit 0 ;;
     *) echo "Opción desconocida: $arg" >&2; exit 1 ;;
   esac
 done
@@ -47,11 +47,11 @@ family() {
     *" fedora "*|*" rhel "*|*" centos "*|*" rocky "*|*" almalinux "*|*" nobara "*) echo rpm-dnf ;;
     *" opensuse"*|*" suse "*|*" sles "*) echo rpm-zypper ;;
     *" arch "*|*" manjaro "*|*" endeavouros "*|*" cachyos "*|*" garuda "*) echo pacman ;;
-    *) echo appimage ;;
+    *) echo portable ;;
   esac
 }
 
-APPIMAGE_PATH="$HOME/.local/lib/$APP/Islet.AppImage"
+PORTABLE_DIR="$HOME/.local/lib/$APP"
 LAUNCHER_PATH="$HOME/.local/bin/$APP"
 DESKTOP_PATH="$HOME/.local/share/applications/$APP.desktop"
 
@@ -62,21 +62,21 @@ uninstall() {
     if have dnf; then $SUDO dnf remove -y "$APP"; elif have zypper; then $SUDO zypper -n remove "$APP"; else $SUDO rpm -e "$APP"; fi
   elif have pacman && pacman -Q "$APP" >/dev/null 2>&1; then $SUDO pacman -R --noconfirm "$APP"
   fi
-  rm -rf "$(dirname "$APPIMAGE_PATH")"; rm -f "$LAUNCHER_PATH" "$DESKTOP_PATH" "$HOME/.local/share/icons/$APP.png" "$HOME/.config/autostart/$APP.desktop"
+  rm -rf "$PORTABLE_DIR"; rm -f "$LAUNCHER_PATH" "$DESKTOP_PATH" "$HOME/.local/share/icons/$APP.png" "$HOME/.config/autostart/$APP.desktop"
   say "Listo"
 }
 [ "$MODE" = uninstall ] && { uninstall; exit 0; }
 
-FAMILY=$( [ "$MODE" = appimage ] && echo appimage || family )
+FAMILY=$( [ "$MODE" = portable ] && echo portable || family )
 case "$FAMILY" in
   deb) EXT='deb' ;;
   rpm-*) EXT='rpm' ;;
   pacman) EXT='pacman' ;;
-  appimage) EXT='AppImage' ;;
+  portable) EXT='tar.gz' ;;
 esac
-# Sin sudo no podemos instalar paquetes del sistema: AppImage en el directorio del usuario.
-if [ "$EXT" != AppImage ] && [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
-  say "No hay sudo/doas, uso AppImage"; EXT='AppImage'; FAMILY=appimage
+# Sin sudo no podemos instalar paquetes del sistema: versión portable en el directorio del usuario.
+if [ "$FAMILY" != portable ] && [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
+  say "No hay sudo/doas, instalo la versión portable"; EXT='tar.gz'; FAMILY=portable
 fi
 
 say "Distro: ${PRETTY_NAME:-desconocida} · arquitectura: $(uname -m) · paquete: .$EXT"
@@ -103,24 +103,20 @@ case "$FAMILY" in
   rpm-dnf) if have dnf; then $SUDO dnf install -y "$FILE"; else $SUDO yum install -y "$FILE"; fi ;;
   rpm-zypper) $SUDO zypper -n install --allow-unsigned-rpm "$FILE" ;;
   pacman) $SUDO pacman -U --noconfirm "$FILE" ;;
-  appimage)
-    mkdir -p "$(dirname "$APPIMAGE_PATH")" "$(dirname "$LAUNCHER_PATH")" "$(dirname "$DESKTOP_PATH")" "$HOME/.local/share/icons"
-    install -m 755 "$FILE" "$APPIMAGE_PATH"
-    # El AppImage no puede usar el sandbox SUID de Chromium; si el kernel restringe los
-    # user namespaces (Ubuntu 24.04+ con AppArmor) hay que arrancar sin sandbox.
+  portable)
+    have tar || die "Necesitas tar"
+    # El .tar.gz trae la app ya desempaquetada: no necesita FUSE ni el runtime de AppImage.
+    mkdir -p "$PORTABLE_DIR" "$(dirname "$LAUNCHER_PATH")" "$(dirname "$DESKTOP_PATH")" "$HOME/.local/share/icons"
+    rm -rf "${PORTABLE_DIR:?}"/*
+    tar -xzf "$FILE" -C "$PORTABLE_DIR" --strip-components=1
+    # Sin root el sandbox SUID de Chromium no está disponible; si además el kernel restringe
+    # los user namespaces (Ubuntu 24.04+ con AppArmor) hay que arrancar sin sandbox.
     FLAGS=""
     if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" = 1 ] \
       || [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" = 0 ]; then
       FLAGS="--no-sandbox"
     fi
-    # Sin FUSE 2 el AppImage no se puede montar: lo extraemos una vez y ejecutamos su AppRun.
-    TARGET="$APPIMAGE_PATH"; NOFUSE=""
-    if ! ldconfig -p 2>/dev/null | grep -q 'libfuse.so.2'; then
-      NOFUSE=1
-      (cd "$(dirname "$APPIMAGE_PATH")" && rm -rf squashfs-root && "$APPIMAGE_PATH" --appimage-extract >/dev/null)
-      TARGET="$(dirname "$APPIMAGE_PATH")/squashfs-root/AppRun"
-    fi
-    printf '#!/bin/sh\nexec env ISLET_LAUNCHER="%s" "%s" %s "$@"\n' "$LAUNCHER_PATH" "$TARGET" "$FLAGS" > "$LAUNCHER_PATH"
+    printf '#!/bin/sh\nexec env ISLET_LAUNCHER="%s" "%s/islet" %s "$@"\n' "$LAUNCHER_PATH" "$PORTABLE_DIR" "$FLAGS" > "$LAUNCHER_PATH"
     chmod 755 "$LAUNCHER_PATH"
     curl -fsSL -o "$HOME/.local/share/icons/$APP.png" "https://raw.githubusercontent.com/$REPO/main/build/icon.png" || true
     cat > "$DESKTOP_PATH" <<DESKTOP
@@ -132,7 +128,6 @@ Exec=$LAUNCHER_PATH
 Icon=$HOME/.local/share/icons/$APP.png
 Categories=Utility;AudioVideo;
 DESKTOP
-    [ -n "$NOFUSE" ] && say "FUSE 2 no está instalado: se usó la versión extraída del AppImage."
     case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) say "Añade ~/.local/bin a tu PATH para lanzar 'islet' desde la terminal" ;; esac
     ;;
 esac

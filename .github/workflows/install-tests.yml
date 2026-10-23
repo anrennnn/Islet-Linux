@@ -35,22 +35,27 @@ jobs:
           - { name: 'openSUSE Leap 15.6 · rpm · x64', image: 'opensuse/leap:15.6',         runner: ubuntu-24.04 }
           - { name: 'Arch Linux · pacman · x64',      image: 'archlinux:latest',           runner: ubuntu-24.04 }
           - { name: 'Manjaro · pacman · x64',         image: 'manjarolinux/base:latest',   runner: ubuntu-24.04 }
-          - { name: 'Ubuntu 24.04 · AppImage · x64',  image: 'ubuntu:24.04',               runner: ubuntu-24.04, mode: '--appimage' }
-          - { name: 'Fedora 42 · AppImage · x64',     image: 'fedora:42',                  runner: ubuntu-24.04, mode: '--appimage' }
+          - { name: 'Ubuntu 24.04 · portable · x64',  image: 'ubuntu:24.04',               runner: ubuntu-24.04, mode: '--portable' }
+          - { name: 'Fedora 42 · portable · x64',     image: 'fedora:42',                  runner: ubuntu-24.04, mode: '--portable' }
+          - { name: 'Ubuntu 24.04 · AppImage · x64',  image: 'ubuntu:24.04',               runner: ubuntu-24.04, mode: '--appimage-file', local_only: true }
+          - { name: 'Fedora 42 · AppImage · x64',     image: 'fedora:42',                  runner: ubuntu-24.04, mode: '--appimage-file', local_only: true }
           - { name: 'Ubuntu 24.04 · deb · arm64',     image: 'ubuntu:24.04',               runner: ubuntu-24.04-arm }
           - { name: 'Debian 12 · deb · arm64',        image: 'debian:12',                  runner: ubuntu-24.04-arm }
           - { name: 'Fedora 42 · rpm · arm64',        image: 'fedora:42',                  runner: ubuntu-24.04-arm }
           - { name: 'openSUSE Tumbleweed · rpm · arm64', image: 'opensuse/tumbleweed',     runner: ubuntu-24.04-arm }
-          - { name: 'Ubuntu 24.04 · AppImage · arm64', image: 'ubuntu:24.04',              runner: ubuntu-24.04-arm, mode: '--appimage' }
+          - { name: 'Ubuntu 24.04 · portable · arm64', image: 'ubuntu:24.04',              runner: ubuntu-24.04-arm, mode: '--portable' }
+          - { name: 'Ubuntu 24.04 · AppImage · arm64', image: 'ubuntu:24.04',              runner: ubuntu-24.04-arm, mode: '--appimage-file', local_only: true }
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
+        if: ${{ !(matrix.local_only && inputs.source != 'local') }}
       - if: inputs.source == 'local'
         uses: actions/download-artifact@v5
         with:
           path: pkgs
           merge-multiple: true
       - name: Instalar, arrancar y desinstalar
+        if: ${{ !(matrix.local_only && inputs.source != 'local') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |

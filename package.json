@@ -102,6 +102,9 @@
         "xdg-utils",
         "at-spi2-core"
       ]
+    },
+    "toolsets": {
+      "appimage": "1.0.3"
     }
   },
   "repository": {

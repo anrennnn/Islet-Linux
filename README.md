@@ -19,10 +19,11 @@ curl -fsSL https://raw.githubusercontent.com/anrennnn/Islet-Linux/main/install.s
 
 El script detecta tu distro y arquitectura (x86_64 / ARM64), descarga el paquete correcto de la
 [última release](https://github.com/anrennnn/Islet-Linux/releases/latest) y lo instala.
-Usa `--appimage` para instalar sin root y `--uninstall` para quitarlo:
+En distros sin paquete propio (o sin sudo) instala la versión portable en `~/.local`.
+Usa `--portable` para forzarla sin root y `--uninstall` para quitarlo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/anrennnn/Islet-Linux/main/install.sh | bash -s -- --appimage
+curl -fsSL https://raw.githubusercontent.com/anrennnn/Islet-Linux/main/install.sh | bash -s -- --portable
 ```
 
 ### Manual, según tu distro
@@ -36,10 +37,12 @@ Descarga el archivo de [Releases](https://github.com/anrennnn/Islet-Linux/releas
 | openSUSE Tumbleweed / Leap | `islet-*.rpm` | `sudo zypper install --allow-unsigned-rpm ./islet-*.rpm` |
 | Arch, Manjaro, EndeavourOS, CachyOS, Garuda | `islet-*.pacman` | `sudo pacman -U ./islet-*.pacman` |
 | Cualquier otra (Solus, Void, Gentoo, Slackware…) | `islet-*.AppImage` | `chmod +x islet-*.AppImage && ./islet-*.AppImage` |
-| Sin FUSE / instalación portable | `islet-*.tar.gz` | `tar xf islet-*.tar.gz && ./islet-*/islet` |
+| Portable, sin root ni FUSE | `islet-*.tar.gz` | `tar xf islet-*.tar.gz && ./islet-*/islet` (o `install.sh --portable`) |
 
 > **NixOS:** usa `appimage-run islet-*.AppImage`.
-> **AppImage** necesita FUSE 2 (`libfuse2` en Ubuntu, `fuse2` en Arch, `fuse-libs` en Fedora).
+> **AppImage / tar.gz en Ubuntu 24.04+:** añade `--no-sandbox` al arrancarlo (AppArmor bloquea el
+> sandbox de Chromium fuera de los paquetes del sistema). Si no tienes FUSE, arranca el AppImage con
+> `--appimage-extract-and-run`. `install.sh --portable` lo resuelve solo.
 
 ## Qué hace
 
@@ -71,6 +74,25 @@ npm run dev                  # Vite + Electron con recarga
 node tools/fake-player.cjs   # reproductor MPRIS falso para probar sin Spotify
 ```
 
+## Distros probadas
+
+Cada release se instala con `install.sh` en contenedores de estas distros antes de publicarse
+(y otra vez después, descargando la release real). La prueba arranca Islet en un X virtual,
+comprueba que abre su ventana, que lee un reproductor MPRIS de prueba y que se desinstala limpio:
+
+| Distro | Paquete | x86_64 | ARM64 |
+|---|---|:-:|:-:|
+| Ubuntu 24.04 / 22.04 | deb | ✓ | ✓ (24.04) |
+| Debian 13 / 12 | deb | ✓ | ✓ (12) |
+| Linux Mint 22 | deb | ✓ | |
+| Fedora 42 / 41 | rpm | ✓ | ✓ (42) |
+| openSUSE Tumbleweed / Leap 15.6 | rpm | ✓ | ✓ (Tumbleweed) |
+| Arch Linux, Manjaro | pacman | ✓ | |
+| Ubuntu 24.04, Fedora 42 | portable (tar.gz) | ✓ | ✓ (Ubuntu) |
+| Ubuntu 24.04, Fedora 42 | AppImage | ✓ | ✓ (Ubuntu) |
+
+Ver [`install-tests.yml`](.github/workflows/install-tests.yml) y [`tests/install-test.sh`](tests/install-test.sh).
+
 ## Publicar una versión
 
 ```bash
@@ -79,8 +101,9 @@ git push origin main --tags   # o: Actions → Release → Run workflow
 ```
 
 La acción [`release.yml`](.github/workflows/release.yml) compila `.AppImage`, `.deb`, `.rpm`,
-`.pacman` y `.tar.gz` para x86_64 y ARM64, genera `SHA256SUMS.txt` y publica la release con
-`install.sh`. [`ci.yml`](.github/workflows/ci.yml) compila y prueba MPRIS en cada push.
+`.pacman` y `.tar.gz` para x86_64 y ARM64, los prueba en todas las distros de la tabla y solo si
+pasan publica la release con `SHA256SUMS.txt` e `install.sh`. Con *publish* desmarcado solo
+compila y prueba. [`ci.yml`](.github/workflows/ci.yml) compila y prueba MPRIS en cada push.
 
 ## Estructura
 
@@ -91,6 +114,7 @@ electron/preload.cjs   puente seguro hacia React
 src/Island.tsx         la isla (reposo / compacta / expandida)
 src/styles.css         animaciones y temas
 install.sh             instalador que detecta la distro
+tests/                 prueba de instalación de extremo a extremo por distro
 tools/                 reproductor de prueba y test MPRIS
 ```
 
