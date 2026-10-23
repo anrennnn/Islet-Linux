@@ -19,7 +19,7 @@ case " $ID $ID_LIKE " in
   *" fedora "*|*" rhel "*)
     dnf -q -y install curl tar gzip sudo xorg-x11-server-Xvfb xorg-x11-xauth xwininfo dbus-daemon dbus-tools which findutils procps-ng >/dev/null ;;
   *" suse "*|*" opensuse"*)
-    zypper -q -n install curl sudo xvfb-run xwininfo /usr/bin/dbus-run-session which findutils procps tar gzip >/dev/null ;;
+    zypper -q -n install curl sudo xvfb-run xwininfo /usr/bin/dbus-daemon which findutils procps tar gzip >/dev/null ;;
   *" arch "*)
     pacman -Syu --noconfirm --needed -q curl sudo xorg-server-xvfb xorg-xauth xorg-xwininfo dbus which findutils procps-ng >/dev/null ;;
 esac
@@ -85,8 +85,15 @@ fi
 kill \$PID
 RUN
 chmod 755 /tmp/run-islet.sh
-sudo -u tester env PATH="/home/tester/.local/bin:$PATH" HOME=/home/tester \
-  dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24' bash /tmp/run-islet.sh
+# openSUSE no trae dbus-run-session: en ese caso levantamos un bus de sesión a mano.
+if command -v dbus-run-session >/dev/null; then
+  sudo -u tester env PATH="/home/tester/.local/bin:$PATH" HOME=/home/tester \
+    dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24' bash /tmp/run-islet.sh
+else
+  sudo -u tester env PATH="/home/tester/.local/bin:$PATH" HOME=/home/tester bash -c '
+    export DBUS_SESSION_BUS_ADDRESS=$(dbus-daemon --session --fork --print-address)
+    xvfb-run -a -s "-screen 0 1920x1080x24" bash /tmp/run-islet.sh'
+fi
 
 if [ "$MODE_ARG" = --appimage-file ]; then echo "### OK: $PRETTY_NAME ${MODE_ARG}"; exit 0; fi
 echo "--- desinstalación"
