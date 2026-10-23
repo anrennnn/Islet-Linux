@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Prueba MPRIS con reproductor falso
+        run: |
+          sudo apt-get update && sudo apt-get install -y dbus
+          dbus-run-session -- bash -c 'node tools/fake-player.cjs & sleep 1 && node tools/test-mpris.cjs'

@@ -1,0 +1,70 @@
+name: Release
+
+# Publica una versión: git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Paquetes ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Herramientas de empaquetado (rpmbuild, bsdtar)
+        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
+      - name: fpm del sistema (el binario incluido en electron-builder es solo x86_64)
+        if: matrix.arch == 'arm64'
+        run: sudo apt-get install -y ruby ruby-dev build-essential && sudo gem install fpm --no-document
+      - run: npm ci
+      - run: npm run build
+      - name: AppImage, deb, rpm, pacman y tar.gz
+        run: npx electron-builder --linux AppImage deb rpm pacman tar.gz --${{ matrix.arch }} --publish never
+        env:
+          USE_SYSTEM_FPM: ${{ matrix.arch == 'arm64' && 'true' || '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: islet-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/*.pacman
+            release/*.tar.gz
+
+  release:
+    name: Publicar release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-all
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist-all && sha256sum * > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist-all/*
+            install.sh
