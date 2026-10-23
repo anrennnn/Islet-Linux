@@ -34,6 +34,19 @@ function resolveArt(url) {
   return null
 }
 
+// dbus-next solo habla con sockets "abstract" a través del módulo nativo usocket, que no
+// empaquetamos. Node sí los soporta con una ruta que empieza por \0, así que reescribimos
+// la dirección (Ubuntu 22.04, sesiones sin systemd, dbus-run-session antiguos…).
+function sessionBusAddress(address = process.env.DBUS_SESSION_BUS_ADDRESS || '') {
+  const parts = address.split(';').filter(Boolean).map((entry) => {
+    const m = entry.match(/^unix:(?:.*,)?abstract=([^,]+)/)
+    return m ? `unix:path=\0${decodeURIComponent(m[1])}` : entry
+  })
+  if (parts.length) return parts.join(';')
+  const runtime = process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.()}`
+  return fs.existsSync(`${runtime}/bus`) ? `unix:path=${runtime}/bus` : undefined
+}
+
 class Player {
   constructor(busName, iface, props, identity) {
     this.busName = busName
@@ -106,7 +119,7 @@ class MprisWatcher extends EventEmitter {
   }
 
   async start() {
-    this.bus = dbus.sessionBus()
+    this.bus = dbus.sessionBus({ busAddress: sessionBusAddress() })
     const obj = await this.bus.getProxyObject('org.freedesktop.DBus', '/org/freedesktop/DBus')
     this.dbusIface = obj.getInterface('org.freedesktop.DBus')
     this.dbusIface.on('NameOwnerChanged', (name, oldOwner, newOwner) => {
@@ -220,4 +233,4 @@ class MprisWatcher extends EventEmitter {
   }
 }
 
-module.exports = { MprisWatcher }
+module.exports = { MprisWatcher, sessionBusAddress }

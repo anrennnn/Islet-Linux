@@ -44,9 +44,9 @@ jobs:
           - { name: 'Ubuntu 24.04 · AppImage · arm64', image: 'ubuntu:24.04',              runner: ubuntu-24.04-arm, mode: '--appimage' }
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - if: inputs.source == 'local'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: pkgs
           merge-multiple: true
@@ -59,4 +59,12 @@ jobs:
           else
             EXTRA="-e ISLET_INSTALLER_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/install.sh -e GITHUB_TOKEN"
           fi
-          docker run --rm -v "$PWD:/src" $EXTRA ${{ matrix.image }} bash /src/tests/install-test.sh ${{ matrix.mode }}
+          set +e
+          docker run --rm -v "$PWD:/src" $EXTRA ${{ matrix.image }} bash /src/tests/install-test.sh ${{ matrix.mode }} 2>&1 | tee test.log
+          code=${PIPESTATUS[0]}
+          # Resumen visible en la pestaña Summary/anotaciones sin abrir el log completo.
+          if [ "$code" != 0 ]; then
+            msg=$(grep -vE 'dbus-daemon|^\s*$' test.log | tail -25 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=${{ matrix.name }}::$msg"
+          fi
+          exit $code

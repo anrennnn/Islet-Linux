@@ -7,7 +7,7 @@
 set -euo pipefail
 MODE_ARG="${1:-}"
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-. /etc/os-release
+. /etc/os-release; ID_LIKE="${ID_LIKE:-}"
 echo "### $PRETTY_NAME ($(uname -m)) ${MODE_ARG}"
 
 # Dependencias del entorno de prueba (no de Islet): curl, sudo, X virtual, D-Bus.

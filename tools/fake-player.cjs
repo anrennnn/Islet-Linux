@@ -3,6 +3,7 @@
 const dbus = require('dbus-next')
 const { Interface, ACCESS_READ } = dbus.interface
 const { Variant } = dbus
+const { sessionBusAddress } = require('../electron/mpris.cjs')
 
 const tracks = [
   { title: 'Midnight City', artist: 'M83', length: 244 },
@@ -56,7 +57,7 @@ class Root extends Interface {
 Root.configureMembers({ properties: { Identity: { signature: 's', access: ACCESS_READ } } })
 
 ;(async () => {
-  const bus = dbus.sessionBus()
+  const bus = dbus.sessionBus({ busAddress: sessionBusAddress() })
   await bus.requestName('org.mpris.MediaPlayer2.fakeplayer', 0)
   bus.export('/org/mpris/MediaPlayer2', new Player())
   bus.export('/org/mpris/MediaPlayer2', new Root())
