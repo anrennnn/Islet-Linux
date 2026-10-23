@@ -11,10 +11,15 @@ on:
       version:
         description: 'Versión a publicar (ej. v0.1.0)'
         required: true
-        default: 'v0.1.0'
+        default: 'v0.1.1'
+      publish:
+        description: 'Publicar la release (desmarca para solo compilar y probar)'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
@@ -56,10 +61,17 @@ jobs:
             release/*.pacman
             release/*.tar.gz
 
+  test:
+    name: Pruebas de instalación
+    needs: build
+    uses: ./.github/workflows/install-tests.yml
+    with:
+      source: local
+
   release:
     name: Publicar release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -77,3 +89,10 @@ jobs:
           files: |
             dist-all/*
             install.sh
+
+  verify:
+    name: Verificar release publicada
+    needs: release
+    uses: ./.github/workflows/install-tests.yml
+    with:
+      source: release

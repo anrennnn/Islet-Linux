@@ -100,8 +100,9 @@ function autostartFile() {
 function setAutostart(enabled) {
   const file = autostartFile()
   if (!enabled) return fs.rmSync(file, { force: true })
-  // En AppImage process.execPath apunta a un montaje temporal; APPIMAGE es la ruta real.
-  const exec = process.env.APPIMAGE || process.execPath
+  // ISLET_LAUNCHER lo define el lanzador de install.sh (lleva los flags necesarios);
+  // en AppImage process.execPath apunta a un montaje temporal y APPIMAGE es la ruta real.
+  const exec = process.env.ISLET_LAUNCHER || process.env.APPIMAGE || process.execPath
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(
     file,
@@ -192,7 +193,11 @@ ipcMain.handle('media:command', (_e, cmd, arg) => mpris.command(cmd, arg).catch(
 ipcMain.handle('app:config', () => config)
 
 app.whenReady().then(async () => {
+  let lastLogged = ''
   mpris.on('change', (state) => {
+    const a = state.active
+    const line = a ? `${a.name}: ${a.title} — ${a.artist} (${a.status})` : 'sin reproductor'
+    if (line !== lastLogged) console.log(`[islet] ${(lastLogged = line)}`)
     const playersChanged = JSON.stringify(state.players) !== JSON.stringify(lastState.players)
     lastState = state
     win?.webContents.send('media:state', state)

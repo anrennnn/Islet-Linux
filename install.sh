@@ -6,6 +6,7 @@
 #
 # Opciones:  --appimage   fuerza la versión AppImage (sin root)
 #            --uninstall  desinstala Islet
+# Variables: ISLET_LOCAL_DIR=<carpeta> instala desde paquetes ya descargados (sin internet)
 set -euo pipefail
 
 REPO="anrennnn/Islet-Linux"
@@ -50,7 +51,8 @@ family() {
   esac
 }
 
-APPIMAGE_PATH="$HOME/.local/bin/$APP"
+APPIMAGE_PATH="$HOME/.local/lib/$APP/Islet.AppImage"
+LAUNCHER_PATH="$HOME/.local/bin/$APP"
 DESKTOP_PATH="$HOME/.local/share/applications/$APP.desktop"
 
 uninstall() {
@@ -60,12 +62,11 @@ uninstall() {
     if have dnf; then $SUDO dnf remove -y "$APP"; elif have zypper; then $SUDO zypper -n remove "$APP"; else $SUDO rpm -e "$APP"; fi
   elif have pacman && pacman -Q "$APP" >/dev/null 2>&1; then $SUDO pacman -R --noconfirm "$APP"
   fi
-  rm -f "$APPIMAGE_PATH" "$DESKTOP_PATH" "$HOME/.local/share/icons/$APP.png" "$HOME/.config/autostart/$APP.desktop"
+  rm -rf "$(dirname "$APPIMAGE_PATH")"; rm -f "$LAUNCHER_PATH" "$DESKTOP_PATH" "$HOME/.local/share/icons/$APP.png" "$HOME/.config/autostart/$APP.desktop"
   say "Listo"
 }
 [ "$MODE" = uninstall ] && { uninstall; exit 0; }
 
-have curl || die "Necesitas curl"
 FAMILY=$( [ "$MODE" = appimage ] && echo appimage || family )
 case "$FAMILY" in
   deb) EXT='deb' ;;
@@ -79,15 +80,23 @@ if [ "$EXT" != AppImage ] && [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
 fi
 
 say "Distro: ${PRETTY_NAME:-desconocida} · arquitectura: $(uname -m) · paquete: .$EXT"
-API="https://api.github.com/repos/$REPO/releases/latest"
-URL=$(curl -fsSL "$API" | grep -oE '"browser_download_url": *"[^"]+"' | cut -d'"' -f4 \
-  | grep -E "\.${EXT}\$" | grep -E "$ARCH_RE" | head -n1) || true
-[ -n "$URL" ] || die "No encontré un .$EXT para $(uname -m) en la última release de $REPO"
-
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-FILE="$TMP/$(basename "$URL")"
-say "Descargando $(basename "$URL")"
-curl -fL --progress-bar -o "$FILE" "$URL"
+if [ -n "${ISLET_LOCAL_DIR:-}" ]; then
+  FILE=$(find "$ISLET_LOCAL_DIR" -maxdepth 1 -type f -name "*.${EXT}" | grep -E "$ARCH_RE" | head -n1) || true
+  [ -n "$FILE" ] || die "No hay un .$EXT para $(uname -m) en $ISLET_LOCAL_DIR"
+  FILE=$(cd "$(dirname "$FILE")" && pwd)/$(basename "$FILE")
+else
+  have curl || die "Necesitas curl"
+  API="https://api.github.com/repos/$REPO/releases/latest"
+  AUTH=(); [ -n "${GITHUB_TOKEN:-}" ] && AUTH=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  URL=$(curl -fsSL "${AUTH[@]}" "$API" | grep -oE '"browser_download_url": *"[^"]+"' | cut -d'"' -f4 \
+    | grep -E "\.${EXT}\$" | grep -E "$ARCH_RE" | head -n1) || true
+  [ -n "$URL" ] || die "No encontré un .$EXT para $(uname -m) en la última release de $REPO"
+  FILE="$TMP/$(basename "$URL")"
+  say "Descargando $(basename "$URL")"
+  curl -fL --progress-bar -o "$FILE" "$URL"
+fi
+chmod a+rx "$TMP"  # apt descarga privilegios al usuario _apt y necesita leer el paquete
 
 case "$FAMILY" in
   deb) $SUDO apt-get install -y "$FILE" ;;
@@ -95,22 +104,35 @@ case "$FAMILY" in
   rpm-zypper) $SUDO zypper -n install --allow-unsigned-rpm "$FILE" ;;
   pacman) $SUDO pacman -U --noconfirm "$FILE" ;;
   appimage)
-    mkdir -p "$(dirname "$APPIMAGE_PATH")" "$(dirname "$DESKTOP_PATH")" "$HOME/.local/share/icons"
+    mkdir -p "$(dirname "$APPIMAGE_PATH")" "$(dirname "$LAUNCHER_PATH")" "$(dirname "$DESKTOP_PATH")" "$HOME/.local/share/icons"
     install -m 755 "$FILE" "$APPIMAGE_PATH"
+    # El AppImage no puede usar el sandbox SUID de Chromium; si el kernel restringe los
+    # user namespaces (Ubuntu 24.04+ con AppArmor) hay que arrancar sin sandbox.
+    FLAGS=""
+    if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" = 1 ] \
+      || [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" = 0 ]; then
+      FLAGS="--no-sandbox"
+    fi
+    # Sin FUSE 2 el AppImage no se puede montar: lo extraemos una vez y ejecutamos su AppRun.
+    TARGET="$APPIMAGE_PATH"; NOFUSE=""
+    if ! ldconfig -p 2>/dev/null | grep -q 'libfuse.so.2'; then
+      NOFUSE=1
+      (cd "$(dirname "$APPIMAGE_PATH")" && rm -rf squashfs-root && "$APPIMAGE_PATH" --appimage-extract >/dev/null)
+      TARGET="$(dirname "$APPIMAGE_PATH")/squashfs-root/AppRun"
+    fi
+    printf '#!/bin/sh\nexec env ISLET_LAUNCHER="%s" "%s" %s "$@"\n' "$LAUNCHER_PATH" "$TARGET" "$FLAGS" > "$LAUNCHER_PATH"
+    chmod 755 "$LAUNCHER_PATH"
     curl -fsSL -o "$HOME/.local/share/icons/$APP.png" "https://raw.githubusercontent.com/$REPO/main/build/icon.png" || true
     cat > "$DESKTOP_PATH" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Islet
 Comment=Isla dinámica con controles multimedia
-Exec=$APPIMAGE_PATH
+Exec=$LAUNCHER_PATH
 Icon=$HOME/.local/share/icons/$APP.png
 Categories=Utility;AudioVideo;
 DESKTOP
-    if ! ldconfig -p 2>/dev/null | grep -q libfuse.so.2; then
-      say "Aviso: AppImage necesita FUSE 2 (libfuse2 / fuse2 / fuse-libs según tu distro)."
-      say "Sin FUSE puedes ejecutarlo con: $APPIMAGE_PATH --appimage-extract-and-run"
-    fi
+    [ -n "$NOFUSE" ] && say "FUSE 2 no está instalado: se usó la versión extraída del AppImage."
     case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) say "Añade ~/.local/bin a tu PATH para lanzar 'islet' desde la terminal" ;; esac
     ;;
 esac
