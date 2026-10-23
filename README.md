@@ -75,7 +75,7 @@ node tools/fake-player.cjs   # reproductor MPRIS falso para probar sin Spotify
 
 ```bash
 npm version patch            # o minor / major
-git push origin main --tags
+git push origin main --tags   # o: Actions → Release → Run workflow
 ```
 
 La acción [`release.yml`](.github/workflows/release.yml) compila `.AppImage`, `.deb`, `.rpm`,

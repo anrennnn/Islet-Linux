@@ -1,10 +1,17 @@
 name: Release
 
-# Publica una versión: git tag v0.1.0 && git push origin v0.1.0
+# Publica una versión de dos formas:
+#   - git tag v0.1.0 && git push origin v0.1.0
+#   - Actions → Release → Run workflow (crea la etiqueta con la versión indicada)
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión a publicar (ej. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
 
 permissions:
   contents: write
@@ -52,7 +59,7 @@ jobs:
   release:
     name: Publicar release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +71,8 @@ jobs:
         run: cd dist-all && sha256sum * > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             dist-all/*
