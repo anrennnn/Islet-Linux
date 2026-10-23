@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('edge', {
   onTheme: subscribe('app:theme'),
   getConfig: () => ipcRenderer.invoke('app:config'),
   command: (cmd, arg) => ipcRenderer.invoke('media:command', cmd, arg),
-  setShape: (rect) => ipcRenderer.send('island:shape', rect)
+  setShape: (rect) => ipcRenderer.send('island:shape', rect),
+  openMenu: () => ipcRenderer.send('island:menu')
 })

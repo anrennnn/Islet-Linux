@@ -38,12 +38,18 @@ export function Island() {
     if (!el || !window.edge) return
     const report = () => {
       const r = el.getBoundingClientRect()
-      window.edge!.setShape({ x: r.x, y: r.y, width: r.width, height: r.height })
+      const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
+      window.edge!.setShape({ x: r.x, y: r.y, width: r.width, height: r.height, radius })
     }
     report()
     const ro = new ResizeObserver(report)
     ro.observe(el)
-    return () => ro.disconnect()
+    // El radio también se anima y no dispara ResizeObserver: recalculamos al terminar.
+    el.addEventListener('transitionend', report)
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('transitionend', report)
+    }
   }, [])
 
   const onEnter = () => {
@@ -56,7 +62,16 @@ export function Island() {
 
   return (
     <div className={`stage theme-${theme}`}>
-      <div ref={ref} className={`island ${mode}`} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      <div
+        ref={ref}
+        className={`island ${mode}`}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          window.edge?.openMenu()
+        }}
+      >
         {mode === 'idle' && <Clock />}
         {mode === 'compact' && track && <Compact track={track} />}
         {mode === 'expanded' && track && <Expanded track={track} receivedAt={receivedAt} />}

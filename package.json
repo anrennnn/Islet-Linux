@@ -1,7 +1,7 @@
 {
   "name": "islet",
   "productName": "Islet",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Isla dinámica para Linux con controles multimedia (MPRIS)",
   "author": "Anthony <seoconanthony@gmail.com>",
   "license": "MIT",
@@ -40,6 +40,7 @@
     "files": [
       "dist/**",
       "electron/**",
+      "build/icon.png",
       "package.json"
     ],
     "directories": {

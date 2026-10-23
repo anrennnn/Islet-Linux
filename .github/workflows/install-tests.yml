@@ -74,3 +74,36 @@ jobs:
             echo "::error title=${{ matrix.name }}::$msg"
           fi
           exit $code
+
+  desktop:
+    name: Escritorio ${{ matrix.wm }}
+    if: inputs.source == 'local'
+    strategy:
+      fail-fast: false
+      matrix:
+        wm: [openbox, mutter, kwin]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          path: pkgs
+          merge-multiple: true
+      - name: Posición, capa y (en Wayland) relanzamiento en XWayland
+        run: |
+          set +e
+          mkdir -p shots && chmod 777 shots
+          timeout 1500 docker run --rm -v "$PWD:/src" -v "$PWD/shots:/tmp/islet-shots" -e ISLET_LOCAL_DIR=/src/pkgs \
+            ubuntu:24.04 bash /src/tests/desktop-test.sh ${{ matrix.wm }} 2>&1 | tee test.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" != 0 ]; then
+            msg=$(grep -vE 'dbus-daemon|^\s*$' test.log | tail -25 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Escritorio ${{ matrix.wm }}::$msg"
+          fi
+          exit $code
+      - if: matrix.wm == 'openbox'
+        uses: actions/upload-artifact@v5
+        with:
+          name: capturas-interaccion
+          path: shots/*.png

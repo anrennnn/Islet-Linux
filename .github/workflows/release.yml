@@ -11,7 +11,7 @@ on:
       version:
         description: 'Versión a publicar (ej. v0.1.0)'
         required: true
-        default: 'v0.1.1'
+        default: 'v0.1.2'
       publish:
         description: 'Publicar la release (desmarca para solo compilar y probar)'
         type: boolean

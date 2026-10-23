@@ -29,7 +29,8 @@ declare global {
       onTheme: (cb: (t: Theme) => void) => () => void
       getConfig: () => Promise<{ theme: Theme }>
       command: (cmd: Command, arg?: unknown) => Promise<void>
-      setShape: (r: { x: number; y: number; width: number; height: number }) => void
+      setShape: (r: { x: number; y: number; width: number; height: number; radius: number }) => void
+      openMenu: () => void
     }
   }
 }

@@ -50,21 +50,23 @@ Descarga el archivo de [Releases](https://github.com/anrennnn/Islet-Linux/releas
 - **Compacta:** carátula + título + ecualizador animado mientras suena algo.
 - **Expandida** (al pasar el ratón o al cambiar de canción): carátula, título, artista,
   reproductor, barra de progreso con *seek* y botones anterior / play-pausa / siguiente.
-- Elige sola el reproductor que está sonando; desde la bandeja puedes fijar uno.
-- Bandeja: reproductor, pantalla (multi-monitor), tema (oscuro / claro / cristal),
-  iniciar con el sistema, salir.
-- Fuera de la isla los clics pasan a las ventanas de debajo.
+- Elige sola el reproductor que está sonando; desde el menú puedes fijar uno.
+- **Clic derecho sobre la isla** (o el icono de la bandeja): reproductor, pantalla
+  (multi-monitor), tema (oscuro / claro / cristal), iniciar con el sistema y salir.
+- Se inicia sola con el sistema desde la primera vez que la abres (se desactiva en el menú).
+- Fuera de la isla los clics pasan a las ventanas de debajo; sin compositor conserva las
+  esquinas redondeadas.
 
 ## Compatibilidad
 
 | Entorno | Estado |
 |---|---|
 | X11 (GNOME, KDE, XFCE, Cinnamon, MATE, i3…) | Completo |
-| Wayland (GNOME, KDE Plasma, Hyprland, Sway…) | Vía XWayland (se activa automáticamente) |
+| Wayland (GNOME, KDE Plasma, Hyprland, Sway…) | Vía XWayland: la app se relanza sola con `--ozone-platform=x11` |
 | Arquitecturas | x86_64 y ARM64 |
 
-Necesitas un compositor para la transparencia (todos los escritorios modernos lo traen; en i3/bspwm
-usa `picom`). En GNOME, el icono de bandeja requiere la extensión *AppIndicator*.
+En GNOME el icono de bandeja requiere la extensión *AppIndicator*; sin ella usa el clic derecho
+sobre la isla. Para forzar Wayland nativo (sin posición fija), arranca con `--ozone-platform=wayland`.
 
 ## Desarrollo
 
@@ -91,7 +93,13 @@ comprueba que abre su ventana, que lee un reproductor MPRIS de prueba y que se d
 | Ubuntu 24.04, Fedora 42 | portable (tar.gz) | ✓ | ✓ (Ubuntu) |
 | Ubuntu 24.04, Fedora 42 | AppImage | ✓ | ✓ (Ubuntu) |
 
-Ver [`install-tests.yml`](.github/workflows/install-tests.yml) y [`tests/install-test.sh`](tests/install-test.sh).
+Además se prueba dentro de escritorios reales: **GNOME (Mutter) y KDE Plasma (KWin) en Wayland**
+y **Openbox en X11**. Se comprueba que la isla queda arriba al centro, siempre encima y que en
+Wayland se relanza en XWayland. En Openbox una prueba mueve el ratón y pulsa play/pausa, siguiente
+y anterior, verificando que el reproductor responde.
+
+Ver [`install-tests.yml`](.github/workflows/install-tests.yml), [`tests/install-test.sh`](tests/install-test.sh),
+[`tests/desktop-test.sh`](tests/desktop-test.sh) y [`tests/interaction-test.sh`](tests/interaction-test.sh).
 
 ## Publicar una versión
 
