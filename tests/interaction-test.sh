@@ -9,6 +9,8 @@ SHOTS=${SHOTS:-/tmp/islet-shots}; mkdir -p "$SHOTS"
 ASAR=$(find /opt /usr/lib -name app.asar -path '*slet*' 2>/dev/null | head -n1)
 ELECTRON_BIN=$(dirname "$(dirname "$ASAR")")/islet
 LOG=/tmp/islet-interaction.log
+# Cierra Xvfb, Openbox, el reproductor e Islet al terminar (Islet es de instancia única).
+trap 'kill $(jobs -p) 2>/dev/null; sleep 1' EXIT
 
 Xvfb :7 -screen 0 1920x1080x24 >/dev/null 2>&1 &
 export DISPLAY=:7; sleep 2

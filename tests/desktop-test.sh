@@ -40,6 +40,7 @@ esac
 sleep 6
 IN
 cat >> /tmp/desktop-run.sh <<'IN'
+trap 'kill $(jobs -p) 2>/dev/null' EXIT
 if [ -z "${DISPLAY:-}" ]; then
   export WAYLAND_DISPLAY=wayland-0 XDG_SESSION_TYPE=wayland
   for _ in $(seq 1 15); do D=$(ls /tmp/.X11-unix | sed 's/X/:/' | head -1); [ -n "$D" ] && break; sleep 1; done
