@@ -2,23 +2,24 @@
 # Prueba de interacción en un escritorio X11 real (Openbox): con un reproductor MPRIS falso,
 # pasa el ratón por la isla, pulsa play/pausa y siguiente, y comprueba que el reproductor
 # responde. Guarda capturas en $SHOTS (por defecto /tmp/islet-shots).
-# Requiere: islet instalado, Xvfb, openbox, xdotool, ImageMagick (import), dbus.
+# Requiere: islet instalado (o ISLET_CMD), Xvfb, un gestor de ventanas (WM, por defecto openbox),
+# xdotool, ImageMagick (import), dbus y python3-gi.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 SHOTS=${SHOTS:-/tmp/islet-shots}; mkdir -p "$SHOTS"
-ASAR=$(find /opt /usr/lib -name app.asar -path '*slet*' 2>/dev/null | head -n1)
-ELECTRON_BIN=$(dirname "$(dirname "$ASAR")")/islet
+ISLET_CMD=${ISLET_CMD:-islet}
+WM=${WM:-openbox}
 LOG=/tmp/islet-interaction.log
 # Cierra Xvfb, Openbox, el reproductor e Islet al terminar (Islet es de instancia única).
 trap 'kill $(jobs -p) 2>/dev/null; sleep 1' EXIT
 
 Xvfb :7 -screen 0 1920x1080x24 >/dev/null 2>&1 &
 export DISPLAY=:7; sleep 2
-openbox >/dev/null 2>&1 & sleep 1
+$WM >/dev/null 2>&1 & sleep 1
 command -v xsetroot >/dev/null && xsetroot -solid "#7a8ca5"   # fondo visible en las capturas
-ELECTRON_RUN_AS_NODE=1 NODE_PATH="$ASAR/node_modules" "$ELECTRON_BIN" "$HERE/tools/fake-player.cjs" &
+python3 "$HERE/tools/fake_player.py" &
 sleep 2
-islet --no-sandbox >"$LOG" 2>&1 &
+$ISLET_CMD >"$LOG" 2>&1 &
 sleep 10   # deja pasar el "peek" inicial de 3,5 s
 
 fail() { echo "FALLO: $*"; tail -20 "$LOG"; exit 1; }

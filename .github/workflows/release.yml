@@ -1,7 +1,7 @@
 name: Release
 
 # Publica una versión de dos formas:
-#   - git tag v0.1.0 && git push origin v0.1.0
+#   - git tag v0.2.0 && git push origin v0.2.0
 #   - Actions → Release → Run workflow (crea la etiqueta con la versión indicada)
 on:
   push:
@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versión a publicar (ej. v0.1.0)'
+        description: 'Versión a publicar (ej. v0.2.0)'
         required: true
-        default: 'v0.1.2'
+        default: 'v0.2.0'
       publish:
         description: 'Publicar la release (desmarca para solo compilar y probar)'
         type: boolean
@@ -23,43 +23,21 @@ permissions:
 
 jobs:
   build:
-    name: Paquetes ${{ matrix.arch }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            arch: x64
-          - runner: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
+    name: Paquetes
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - name: Herramientas de empaquetado (rpmbuild, bsdtar)
-        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
-      - name: fpm del sistema (el binario incluido en electron-builder es solo x86_64)
-        if: matrix.arch == 'arm64'
-        run: sudo apt-get install -y ruby ruby-dev build-essential && sudo gem install fpm --no-document
-      - run: npm ci
-      - run: npm run build
-      - name: AppImage, deb, rpm, pacman y tar.gz
-        run: npx electron-builder --linux AppImage deb rpm pacman tar.gz --${{ matrix.arch }} --publish never
-        env:
-          USE_SYSTEM_FPM: ${{ matrix.arch == 'arm64' && 'true' || '' }}
+      - name: Herramientas (fpm, rpmbuild, bsdtar)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential rpm libarchive-tools zstd
+          sudo gem install fpm --no-document
+      - run: bash packaging/build.sh
       - uses: actions/upload-artifact@v5
         with:
-          name: islet-${{ matrix.arch }}
+          name: islet-paquetes
           if-no-files-found: error
-          path: |
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
-            release/*.pacman
-            release/*.tar.gz
+          path: dist/*
 
   test:
     name: Pruebas de instalación
@@ -78,7 +56,7 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           path: dist-all
-          pattern: islet-*
+          pattern: islet-paquetes
           merge-multiple: true
       - name: Checksums
         run: cd dist-all && sha256sum * > SHA256SUMS.txt

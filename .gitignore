@@ -1,3 +1,5 @@
-node_modules/
 dist/
+__pycache__/
+*.pyc
+node_modules/
 release/

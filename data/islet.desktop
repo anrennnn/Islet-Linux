@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Islet
+GenericName=Isla dinámica
+Comment=Isla dinámica con controles multimedia (MPRIS)
+Exec=islet
+Icon=islet
+Terminal=false
+Categories=AudioVideo;Audio;Utility;GTK;
+Keywords=dynamic;island;media;music;mpris;
+StartupNotify=false

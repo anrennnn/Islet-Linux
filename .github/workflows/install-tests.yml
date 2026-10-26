@@ -2,8 +2,8 @@ name: Install tests
 
 # Instala Islet en contenedores de cada distro con install.sh, lo arranca en un X virtual,
 # comprueba que abre su ventana y lee un reproductor MPRIS de prueba, y lo desinstala.
-#   source=local   → paquetes recién compilados (artefactos de este run)
-#   source=release → curl … install.sh | bash contra la última release publicada
+#   source=local   → paquetes recién construidos (artefactos de este run)
+#   source=release → install.sh publicado contra la última release
 on:
   workflow_call:
     inputs:
@@ -24,39 +24,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: 'Ubuntu 24.04 · deb · x64',       image: 'ubuntu:24.04',               runner: ubuntu-24.04 }
-          - { name: 'Ubuntu 22.04 · deb · x64',       image: 'ubuntu:22.04',               runner: ubuntu-24.04 }
-          - { name: 'Debian 12 · deb · x64',          image: 'debian:12',                  runner: ubuntu-24.04 }
-          - { name: 'Debian 13 · deb · x64',          image: 'debian:13',                  runner: ubuntu-24.04 }
-          - { name: 'Linux Mint 22 · deb · x64',      image: 'linuxmintd/mint22-amd64',    runner: ubuntu-24.04 }
-          - { name: 'Fedora 42 · rpm · x64',          image: 'fedora:42',                  runner: ubuntu-24.04 }
-          - { name: 'Fedora 41 · rpm · x64',          image: 'fedora:41',                  runner: ubuntu-24.04 }
-          - { name: 'openSUSE Tumbleweed · rpm · x64', image: 'opensuse/tumbleweed',       runner: ubuntu-24.04 }
-          - { name: 'openSUSE Leap 15.6 · rpm · x64', image: 'opensuse/leap:15.6',         runner: ubuntu-24.04 }
-          - { name: 'Arch Linux · pacman · x64',      image: 'archlinux:latest',           runner: ubuntu-24.04 }
-          - { name: 'Manjaro · pacman · x64',         image: 'manjarolinux/base:latest',   runner: ubuntu-24.04 }
-          - { name: 'Ubuntu 24.04 · portable · x64',  image: 'ubuntu:24.04',               runner: ubuntu-24.04, mode: '--portable' }
-          - { name: 'Fedora 42 · portable · x64',     image: 'fedora:42',                  runner: ubuntu-24.04, mode: '--portable' }
-          - { name: 'Ubuntu 24.04 · AppImage · x64',  image: 'ubuntu:24.04',               runner: ubuntu-24.04, mode: '--appimage-file', local_only: true }
-          - { name: 'Fedora 42 · AppImage · x64',     image: 'fedora:42',                  runner: ubuntu-24.04, mode: '--appimage-file', local_only: true }
-          - { name: 'Ubuntu 24.04 · deb · arm64',     image: 'ubuntu:24.04',               runner: ubuntu-24.04-arm }
-          - { name: 'Debian 12 · deb · arm64',        image: 'debian:12',                  runner: ubuntu-24.04-arm }
-          - { name: 'Fedora 42 · rpm · arm64',        image: 'fedora:42',                  runner: ubuntu-24.04-arm }
-          - { name: 'openSUSE Tumbleweed · rpm · arm64', image: 'opensuse/tumbleweed',     runner: ubuntu-24.04-arm }
-          - { name: 'Ubuntu 24.04 · portable · arm64', image: 'ubuntu:24.04',              runner: ubuntu-24.04-arm, mode: '--portable' }
-          - { name: 'Ubuntu 24.04 · AppImage · arm64', image: 'ubuntu:24.04',              runner: ubuntu-24.04-arm, mode: '--appimage-file', local_only: true }
+          - { name: 'Ubuntu 24.04 · deb · x64',          image: 'ubuntu:24.04',             runner: ubuntu-24.04 }
+          - { name: 'Ubuntu 22.04 · deb · x64',          image: 'ubuntu:22.04',             runner: ubuntu-24.04 }
+          - { name: 'Debian 13 · deb · x64',             image: 'debian:13',                runner: ubuntu-24.04 }
+          - { name: 'Debian 12 · deb · x64',             image: 'debian:12',                runner: ubuntu-24.04 }
+          - { name: 'Linux Mint 22 · deb · x64',         image: 'linuxmintd/mint22-amd64',  runner: ubuntu-24.04 }
+          - { name: 'Fedora 42 · rpm · x64',             image: 'fedora:42',                runner: ubuntu-24.04 }
+          - { name: 'Fedora 41 · rpm · x64',             image: 'fedora:41',                runner: ubuntu-24.04 }
+          - { name: 'openSUSE Tumbleweed · rpm · x64',   image: 'opensuse/tumbleweed',      runner: ubuntu-24.04 }
+          - { name: 'openSUSE Leap 15.6 · rpm · x64',    image: 'opensuse/leap:15.6',       runner: ubuntu-24.04 }
+          - { name: 'Arch Linux · pacman · x64',         image: 'archlinux:latest',         runner: ubuntu-24.04 }
+          - { name: 'Manjaro · pacman · x64',            image: 'manjarolinux/base:latest', runner: ubuntu-24.04 }
+          - { name: 'Ubuntu 24.04 · portable · x64',     image: 'ubuntu:24.04',             runner: ubuntu-24.04, mode: '--portable' }
+          - { name: 'Fedora 42 · portable · x64',        image: 'fedora:42',                runner: ubuntu-24.04, mode: '--portable' }
+          - { name: 'Ubuntu 24.04 · deb · arm64',        image: 'ubuntu:24.04',             runner: ubuntu-24.04-arm }
+          - { name: 'Debian 12 · deb · arm64',           image: 'debian:12',                runner: ubuntu-24.04-arm }
+          - { name: 'Fedora 42 · rpm · arm64',           image: 'fedora:42',                runner: ubuntu-24.04-arm }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
-        if: ${{ !(matrix.local_only && inputs.source != 'local') }}
       - if: inputs.source == 'local'
         uses: actions/download-artifact@v6
         with:
           path: pkgs
+          pattern: islet-paquetes
           merge-multiple: true
       - name: Instalar, arrancar y desinstalar
-        if: ${{ !(matrix.local_only && inputs.source != 'local') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -68,7 +62,7 @@ jobs:
           set +e
           timeout 1200 docker run --rm -v "$PWD:/src" $EXTRA ${{ matrix.image }} bash /src/tests/install-test.sh ${{ matrix.mode }} 2>&1 | tee test.log
           code=${PIPESTATUS[0]}
-          # Resumen visible en la pestaña Summary/anotaciones sin abrir el log completo.
+          # Resumen visible en las anotaciones sin abrir el log completo.
           if [ "$code" != 0 ]; then
             msg=$(grep -vE 'dbus-daemon|^\s*$' test.log | tail -25 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=${{ matrix.name }}::$msg"
@@ -81,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        wm: [openbox, mutter, kwin]
+        wm: [xfwm4, xfwm4-composite, openbox, mutter, kwin]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -89,8 +83,9 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           path: pkgs
+          pattern: islet-paquetes
           merge-multiple: true
-      - name: Posición, capa y (en Wayland) relanzamiento en XWayland
+      - name: Posición, capa, interacción y (en Wayland) uso de XWayland
         run: |
           set +e
           mkdir -p shots && chmod 777 shots
@@ -102,8 +97,9 @@ jobs:
             echo "::error title=Escritorio ${{ matrix.wm }}::$msg"
           fi
           exit $code
-      - if: matrix.wm == 'openbox'
+      - if: always() && startsWith(matrix.wm, 'xfwm4') || matrix.wm == 'openbox'
         uses: actions/upload-artifact@v5
         with:
-          name: capturas-interaccion
-          path: shots/*.png
+          name: capturas-${{ matrix.wm }}
+          path: shots/**/*.png
+          if-no-files-found: ignore
