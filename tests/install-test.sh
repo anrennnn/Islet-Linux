@@ -19,7 +19,7 @@ case " $ID $ID_LIKE " in
   *" fedora "*|*" rhel "*)
     dnf -q -y install curl tar gzip sudo xorg-x11-server-Xvfb xorg-x11-xauth xwininfo dbus-daemon dbus-tools which findutils procps-ng >/dev/null ;;
   *" suse "*|*" opensuse"*)
-    zypper -q -n install curl sudo xvfb-run xwininfo /usr/bin/dbus-daemon which findutils procps tar gzip >/dev/null ;;
+    zypper -q -n install curl sudo xvfb-run xwininfo /usr/bin/dbus-daemon which findutils procps tar gzip gawk >/dev/null ;;
   *" arch "*)
     pacman -Syu --noconfirm --needed -q curl sudo xorg-server-xvfb xorg-xauth xorg-xwininfo dbus which findutils procps-ng >/dev/null ;;
 esac

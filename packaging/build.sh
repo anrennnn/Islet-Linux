@@ -74,10 +74,11 @@ if command -v fpm >/dev/null; then
           --url https://github.com/anrennnn/Islet-Linux --maintainer "Anthony <seoconanthony@gmail.com>"
           --description "Isla dinámica con controles multimedia (MPRIS) para Linux")
   if command -v rpmbuild >/dev/null; then
-    # Alternativas con nombre de Fedora y de openSUSE.
+    # Fedora: gtk3 y python3-gobject ya traen el typelib y el puente con cairo.
+    # openSUSE: "gtk3" lo cumple libgtk-3-0, que no trae typelib ni puente: se piden aparte.
     fpm "${COMMON[@]}" -t rpm -p "$OUT/islet-$VERSION-1.noarch.rpm" --rpm-os linux \
-      -d python3 -d python3-gobject -d "(python3-gobject-cairo or python3-cairo)" \
-      -d "(gtk3 or typelib-1_0-Gtk-3_0)" . >/dev/null
+      -d python3 -d python3-gobject -d gtk3 \
+      -d "(typelib-1_0-Gtk-3_0 if libgtk-3-0)" -d "(python3-gobject-cairo if libgtk-3-0)" . >/dev/null
     echo "  dist/islet-$VERSION-1.noarch.rpm"
   fi
   if command -v bsdtar >/dev/null; then
